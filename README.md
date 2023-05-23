@@ -6,7 +6,7 @@ Bellabeat is a small company founded in 2013 by Urška Sršen and Sando Mur, foc
 
 ## Business Task:
 
- he business task for Bellabeat is to unlock new growth opportunities by leveraging data from smart device usage. They want to identify trends and patterns in order to gain valuable insights and develop a data-driven marketing strategy.
+The business task for Bellabeat is to unlock new growth opportunities by leveraging data from smart device usage. They want to identify trends and patterns in order to gain valuable insights and develop a data-driven marketing strategy.
 
 ## Data Preparation:
 
@@ -16,7 +16,7 @@ The data used for analysis is personal fitness tracker data from thirty Fitbit u
 
 ### 1.Trends in Smart Device Usage:
 
-edentary activity is the most predominant throughout the day.
+Sedentary activity is the most predominant throughout the day.
 No significant correlation between sedentary, lightly active, and fairly active activities with calorie burn.
 Moderate correlation observed between very active activities and caloric expenditure.
 Inverse correlation between sedentary time and sleep duration.
