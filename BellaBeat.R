@@ -1,0 +1,207 @@
+##Import package
+install.packages("tidyverse")
+library(tidyverse)
+library(readr)
+install.packages("ggrepel")
+library(ggrepel)
+install.packages("gridExtra")
+library(gridExtra)
+install.packages("cowplot")
+library(cowplot)
+
+##Import Data
+dailyActivity_merged <- read_csv("Bellabeat/dailyActivity_merged.csv", 
+                          +col_types = cols(ActivityDate = col_date(format = "%m/%d/%Y")))
+dailyCalories_merged <- read_csv("Bellabeat/dailyCalories_merged.csv", 
+                                   +     col_types = cols(ActivityDay = col_date(format = "%m/%d/%Y")))
+
+dailyIntensities_merged <- read_csv("Bellabeat/dailyIntensities_merged.csv", 
+                                      +     col_types = cols(ActivityDay = col_date(format = "%m/%d/%Y")))
+
+dailySteps_merged <- read_csv("Bellabeat/dailySteps_merged.csv", 
+                                +     col_types = cols(ActivityDay = col_date(format = "%m/%d/%Y")))
+
+sleepDay_merged <- read_csv("Bellabeat/sleepDay_merged.csv", 
+                              +     col_types = cols(SleepDay = col_datetime(format = "%m/%d/%Y %I:%M:%S %p")))
+
+weightLogInfo_merged <- read_csv("Bellabeat/weightLogInfo_merged.csv", 
+                                   +     col_types = cols(Date = col_datetime(format = "%m/%d/%Y %I:%M:%S %p")))
+
+## Change columnn name in dailyIntensities
+dailyIntensities_merged <- dailyIntensities_merged %>%
+  rename(ActivityDate = ActivityDay)
+
+##Merge Data frame
+Merge1 <- merge(dailySteps_merged,dailyCalories_merged, by = c("Id","ActivityDay"))
+
+## Merge Activity and Intensities
+Merge2 <- merge(dailyActivity_merged, dailyIntensities_merged, by = c("ActivityDate", "SedentaryMinutes", "Id", "LightlyActiveMinutes", "VeryActiveDistance",
+                                                            "LightActiveDistance", "SedentaryActiveDistance", "ModeratelyActiveDistance",
+                                                            "FairlyActiveMinutes", "VeryActiveMinutes"))
+all_daily <- merge(Merge1, Merge2, by.x  = c("Id","ActivityDay"), by.y = c("Id", "ActivityDate"))
+all_daily <- all_daily %>% select(-TotalSteps,-Calories.y)
+##Merge all_daily with Sleep
+Sleep <- merge(all_daily, sleepDay_merged, by.x =  c("Id","ActivityDay"), by.y = c("Id","SleepDay"))
+
+## Merge All Data
+###change weightLogInfo_merged Date Column data type
+weightLogInfo_merged$Date <- as.Date(weightLogInfo_merged$Date, format="%Y/%m/%d %H:%M:%S")
+### Merge Sleep and Weight
+Merge3 <- merge(sleepDay_merged,weightLogInfo_merged, by.x = c("Id","SleepDay"), by.y = c("Id","Date"))
+##Merge All
+MergeALL <- merge(all_daily, Merge3, by.x  = c("Id", "ActivityDay"), by.y = c("Id", "SleepDay"))
+
+glimpse(MergeALL)
+glimpse(all_daily)
+glimpse(Sleep)
+
+##Find the componient percentage of activity kind
+Mean <- MergeALL %>%
+  summarise(mean_value = c(mean(SedentaryMinutes), mean(LightlyActiveMinutes), mean(FairlyActiveMinutes), mean(VeryActiveMinutes))) %>%
+  mutate(Label = c("Sedentary", "Lightly", "Fairly", "Very Active")) %>% 
+  mutate(Percentage = (mean_value / sum(mean_value))*100)
+
+
+df2 <-Mean %>% 
+  mutate(csum = rev(cumsum(rev(Percentage))), 
+         pos = Percentage/2 + lead(csum, 1),
+         pos = if_else(is.na(pos), Percentage/2, pos))
+
+ggplot(Mean, aes(x = "" , y = Percentage, fill = fct_inorder(Label))) +
+  geom_col(width = 1, color = 1) +
+  coord_polar(theta = "y", start = 0) +
+  scale_fill_brewer(palette = "Pastel1") +
+  geom_label_repel(data = df2,
+                   aes(y = pos, label = paste0(round(Percentage,digits = 2), "%")),
+                   size = 4.5, nudge_x = 1, show.legend = FALSE) +
+  guides(fill = guide_legend(title = "Activity Category")) + labs(title= "Percentage of Activities Kind by Minutes") +theme_void()
+  
+
+#Make plot between total step and calories burned
+ggplot(data = all_daily) +
+  geom_point(mapping = aes(x = StepTotal, y = Calories.x), color = "blue")
+
+
+#Make Plot between Activities and Calories Burn
+##Sedentary
+correlation_Calories_Sedentary <- cor(all_daily$Calories.x, all_daily$SedentaryMinutes)
+
+plot_Sedentary <- ggplot(data = all_daily, mapping = aes(x = SedentaryMinutes, y = Calories.x)) +
+  geom_point(color = "blue") +
+  geom_smooth() +
+  labs(title = "Sedentary Activities and Calories Burned")
+
+##Lightly
+correlation_Calories_Lightly <- cor(all_daily$Calories.x, all_daily$LightlyActiveMinutes)
+
+plot_Lightly <- ggplot(data = all_daily, mapping = aes(x = LightlyActiveMinutes, y = Calories.x)) +
+  geom_point(color = "blue") +
+  geom_smooth() +
+  labs(title = "Lightly Activities and Calories Burned")
+
+##Fairly
+correlation_Calories_Fairly <- cor(all_daily$Calories.x, all_daily$FairlyActiveMinutes)
+
+plot_Fairly <- ggplot(data = all_daily, mapping = aes(x = FairlyActiveMinutes, y = Calories.x)) +
+  geom_point(color = "blue") +
+  geom_smooth() +
+  labs(title = "Fairly Activities and Calories Burned")
+
+##Very Active
+correlation_Calories_VeryActive <- cor(all_daily$Calories.x, all_daily$VeryActiveMinutes)
+
+plot_VeryActive <- ggplot(data = all_daily, mapping = aes(x = VeryActiveMinutes, y = Calories.x)) +
+  geom_point(color = "blue") +
+  geom_smooth() +
+  labs(title = "Very Active Activities and Calories Burned")
+
+
+# Combine plots into a single image
+plot_grid(plot_Sedentary, plot_Lightly, plot_Fairly, plot_VeryActive, nrow = 2, ncol = 2)
+
+
+#Activities vs Sleep
+#Create Subset
+subset <- Sleep[c("TotalMinutesAsleep","VeryActiveMinutes","SedentaryMinutes","LightlyActiveMinutes","FairlyActiveMinutes")]
+
+# Reshape the data into a tidy format
+tranformed_activitykind <- tidyr::pivot_longer(subset, cols = -TotalMinutesAsleep, names_to = "activity_kind", values_to = "Minutes")
+
+#Create plot
+ggplot(data = tranformed_activitykind)+geom_point(aes(x=TotalMinutesAsleep, y = Minutes,color = activity_kind))+
+  geom_smooth(aes(x = TotalMinutesAsleep, y = Minutes, color = activity_kind))+
+  labs(title = "Correlation between Activity duration with Sleep time", x = "Sleep time", y = "Minutes", color = "Activity Category")
+
+#Calculate the correlation
+cor(Sleep$TotalMinutesAsleep,Sleep$SedentaryMinutes)
+cor(Sleep$TotalMinutesAsleep,Sleep$LightlyActiveMinutes)
+cor(Sleep$TotalMinutesAsleep,Sleep$FairlyActiveMinutes)
+cor(Sleep$TotalMinutesAsleep,Sleep$VeryActiveMinutes)
+
+#Rate Sleep
+  Sleep <- Sleep %>%
+    mutate(Sleep_Rating = case_when(
+      TotalMinutesAsleep < 420 ~ "Bad Sleep",
+      TotalMinutesAsleep >= 420 & TotalMinutesAsleep <= 540 ~ "Normal Sleep",
+      TRUE ~ "Over Sleep"
+    ))
+  
+  #Make table Longer
+  Sleep_long <- Sleep %>%
+    pivot_longer(cols = c(SedentaryMinutes, LightlyActiveMinutes, FairlyActiveMinutes,VeryActiveMinutes), names_to = "Activity_kind", values_to = "Minutes")
+  
+##Make the BMI group
+  All_byBMI <- merge(dailyIntensities_merged,weightLogInfo_merged , by.x = c("Id","ActivityDate"), by.y = c("Id","Date")) %>% 
+    group_by(Id) %>% 
+    summarise(
+      BMI_type = factor(
+        case_when(
+          BMI < 18.5 ~ "Underweight",
+          BMI >= 18.5 & BMI < 25 ~ "Healthy Weight",
+          BMI >= 25 & BMI < 30 ~ "Overweight",
+          BMI >= 30 ~ "Obesity"
+        )
+      ),
+      SedentaryMinutes,LightlyActiveMinutes,
+      FairlyActiveMinutes,VeryActiveMinutes
+    
+    ) %>% 
+    pivot_longer(cols = c(SedentaryMinutes, LightlyActiveMinutes, FairlyActiveMinutes,
+                          VeryActiveMinutes), names_to = "Activity_kind", values_to = "Minutes")
+  All_byBMI1 <- All_byBMI %>% 
+    group_by(BMI_type, Activity_kind) %>% 
+    summarise(avg_minutes = mean(Minutes)) %>% 
+    mutate(Sum= sum(avg_minutes)) %>% mutate(percentage= avg_minutes/Sum *100)
+ #Make Chart 
+  ggplot(data = All_byBMI1, aes(x = BMI_type, y = percentage, fill = Activity_kind)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    scale_fill_brewer(palette = "Set2")+
+  labs(title = "Percentage of Activity kind With BMI", x = "BMI Category", y = "Percentage",fill = "Activity Category")
+  
+  
+  ##Make the BMI step group
+  All_byBMI_step <- merge(dailySteps_merged,weightLogInfo_merged , by.x = c("Id","ActivityDay"), by.y = c("Id","Date")) %>% 
+    group_by(Id) %>% 
+    summarise(
+      BMI_type = factor(
+        case_when(
+          BMI < 18.5 ~ "Underweight",
+          BMI >= 18.5 & BMI < 25 ~ "Healthy Weight",
+          BMI >= 25 & BMI < 30 ~ "Overweight",
+          BMI >= 30 ~ "Obesity"
+        )
+      ),
+      StepTotal
+      
+    ) 
+  All_byBMI_step <-merge(All_byBMI_step,select(dailyActivity_merged,"Id","Calories"),by = "Id")
+  #Make Chart 
+  ggplot(data = All_byBMI_step, aes(x = StepTotal, y = Calories)) + 
+    geom_point(aes(color = BMI_type)) +
+    labs(title = "Step and Calories Burned by BMI", x = "Step", y = "Calories Burned",color = "BMI type")
+  
+  
+  
+  
+  
+  
